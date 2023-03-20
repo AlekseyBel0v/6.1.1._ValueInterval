@@ -1,20 +1,20 @@
 import java.util.*;
+import java.util.concurrent.*;
 
 public class Main {
-    public static void main(String[] args) {
+    public static void main(String[] args) throws InterruptedException, ExecutionException {
 
 //    Time: 72195ms
         String[] texts = new String[25];
         for (int i = 0; i < texts.length; i++) {
             texts[i] = generateText("aab", 30_000);
         }
-        ThreadGroup threadGroup = new ThreadGroup("group1");
-        List<Thread> tasksByTheLongestInterval = new ArrayList<>();
+        List<Callable <Integer>> listByTheLongestInterval = new ArrayList<>();
         for (String text : texts) {
-            tasksByTheLongestInterval.add(new Thread(threadGroup, () -> {
+            listByTheLongestInterval.add(() -> {
                 int maxSize = 0;
-                for (int i = 0; i < text.length(); i++) {               //1-30_000
-                    for (int j = 0; j < text.length(); j++) {           //1-30_000
+                for (int i = 0; i < text.length(); i++) {
+                    for (int j = 0; j < text.length(); j++) {
                         if (i >= j) {
                             continue;
                         }
@@ -31,15 +31,22 @@ public class Main {
                     }
                 }
                 System.out.println(text.substring(0, 100) + " -> " + maxSize);
-            }));
+                return maxSize;
+            });
         }
 
+        final ExecutorService threadPool = Executors.newFixedThreadPool(25);
         long startTs = System.currentTimeMillis(); // start time
-        tasksByTheLongestInterval.forEach(Thread::start);
-        while (threadGroup.activeCount() > 0) {
+        List<Future<Integer>> futureList = threadPool.invokeAll(listByTheLongestInterval);
+        List<Integer> listMax = new ArrayList<>();
+        for (Future<Integer> future : futureList) {
+            listMax.add(future.get());
         }
+        int max = listMax.stream().max(Integer::compareTo).get();
         long endTs = System.currentTimeMillis();
         System.out.println("Time: " + (endTs - startTs) + "ms");
+        System.out.println("Max value = " + max);
+        threadPool.awaitTermination(10, TimeUnit.SECONDS);      //Почему программа не завершается?
     }
 
     public static String generateText(String letters, int length) {
